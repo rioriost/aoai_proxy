@@ -15,8 +15,18 @@ dependencies = [
     "uvicorn[standard]>=0.30.0",
 ]
 
+[project.optional-dependencies]
+test = [
+  "pytest>=9",
+  "pytest-cov>=7",
+]
+
 [project.scripts]
 aoai-proxy = "aoai_proxy.main:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
 
 [build-system]
 requires = ["uv_build>=0.9.27,<0.10.0"]
