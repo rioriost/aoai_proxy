@@ -1,0 +1,28 @@
+services:
+  aoai-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: aoai-proxy:latest
+    container_name: aoai-proxy
+    ports:
+      - "${AOAI_PROXY_PORT:-8000}:8000"
+    environment:
+      AOAI_PROXY_AZURE_OPENAI_ENDPOINT: ${AOAI_PROXY_AZURE_OPENAI_ENDPOINT:?Set AOAI_PROXY_AZURE_OPENAI_ENDPOINT}
+      AOAI_PROXY_AZURE_OPENAI_DEPLOYMENT: ${AOAI_PROXY_AZURE_OPENAI_DEPLOYMENT:?Set AOAI_PROXY_AZURE_OPENAI_DEPLOYMENT}
+      AOAI_PROXY_AZURE_OPENAI_API_VERSION: ${AOAI_PROXY_AZURE_OPENAI_API_VERSION:-preview}
+      AOAI_PROXY_AZURE_OPENAI_BEARER_TOKEN: ${AOAI_PROXY_AZURE_OPENAI_BEARER_TOKEN:-}
+      AOAI_PROXY_HOST: 0.0.0.0
+      AOAI_PROXY_PORT: 8000
+      AOAI_PROXY_LOG_LEVEL: ${AOAI_PROXY_LOG_LEVEL:-INFO}
+      AOAI_PROXY_REQUEST_TIMEOUT_SECONDS: ${AOAI_PROXY_REQUEST_TIMEOUT_SECONDS:-600}
+      AOAI_PROXY_TOKEN_SCOPE: ${AOAI_PROXY_TOKEN_SCOPE:-https://cognitiveservices.azure.com/.default}
+    volumes:
+      - ${HOME}/.azure:/root/.azure
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

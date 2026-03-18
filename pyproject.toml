@@ -1,0 +1,23 @@
+[project]
+name = "aoai-proxy"
+version = "0.1.0"
+description = "OpenAI-compatible proxy for Azure OpenAI using Entra ID authentication"
+readme = "README.md"
+authors = [
+    { name = "Rio Fujita", email = "rio_github@rio.st" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "azure-identity>=1.17.1",
+    "fastapi>=0.115.0",
+    "httpx>=0.27.0",
+    "pydantic-settings>=2.4.0",
+    "uvicorn[standard]>=0.30.0",
+]
+
+[project.scripts]
+aoai-proxy = "aoai_proxy.main:main"
+
+[build-system]
+requires = ["uv_build>=0.9.27,<0.10.0"]
+build-backend = "uv_build"
