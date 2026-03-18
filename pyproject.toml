@@ -3,10 +3,12 @@ name = "aoai-proxy"
 version = "0.1.0"
 description = "OpenAI-compatible proxy for Azure OpenAI using Entra ID authentication"
 readme = "README.md"
+requires-python = ">=3.12"
 authors = [
     { name = "Rio Fujita", email = "rio_github@rio.st" }
 ]
-requires-python = ">=3.12"
+license = { text = "MIT" }
+
 dependencies = [
     "azure-identity>=1.17.1",
     "fastapi>=0.115.0",
@@ -17,12 +19,16 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
-  "pytest>=9",
-  "pytest-cov>=7",
+    "pytest>=9",
+    "pytest-cov>=7",
 ]
 
 [project.scripts]
 aoai-proxy = "aoai_proxy.main:main"
+
+[project.urls]
+Homepage = "https://github.com/rioriost/homebrew-aoai_proxy"
+Issues = "https://github.com/rioriost/homebrew-aoai_proxy/issues"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

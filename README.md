@@ -1,232 +1,88 @@
 # aoai-proxy
 
-Azure OpenAI に対して Entra ID 認証でアクセスしつつ、クライアント側には OpenAI 互換 API として振る舞う軽量プロキシです。
+Zed からは OpenAI 互換 API サーバとして見えつつ、Azure OpenAI には Entra ID 認証で接続するための軽量プロキシです。
 
-この用途では、Zed などの OpenAI 互換エンドポイントを利用できるクライアントから `api_key` をダミー値で設定して接続し、実際の Azure OpenAI への認証はこのプロキシが `az login` 済みの Azure CLI 資格情報を使って行います。
+Azure OpenAI 側で API キー認証を無効化していても、ローカルで `az login` 済みであれば、Zed の OpenAI compatible provider から `gpt-5.4` を利用できます。
 
-## 想定ユースケース
+## これは何？
 
-- Azure OpenAI 側で API キー認証を無効化している
-- ローカルでは `az login` 済み
-- Zed から OpenAI 互換 API として接続したい
-- Azure OpenAI 上の `GPT-5.4` デプロイを AI エージェント用途で使いたい
+このプロキシは、次のような用途を想定しています。
 
-## 仕組み
-
-このプロキシは以下のように動作します。
-
-1. クライアントは OpenAI 互換 API としてこのプロキシへ接続
-2. プロキシは `AzureCliCredential` を使って Entra ID アクセストークンを取得
-3. Azure OpenAI へ `Authorization: Bearer ...` で転送
-4. Azure OpenAI のレスポンスをそのままクライアントへ返却
-
-現状、主に以下の OpenAI 互換パスを想定しています。
-
-- `GET /v1/models`
-- `POST /v1/responses`
-- `POST /v1/embeddings`
+- Azure OpenAI 側では API キー認証を無効化している
+- Azure OpenAI には Entra ID 認証でアクセスしたい
+- Zed からは OpenAI compatible provider として使いたい
+- Azure OpenAI 上の `gpt-5.4` deployment を Zed の AI Agent として使いたい
 
 このプロキシは **responses-first** の方針で実装しています。  
-特に Zed からの利用では `POST /v1/responses` を正規ルートとして扱います。
+主に `POST /v1/responses` を Zed から受け取り、Azure OpenAI の `Responses API` に中継します。
 
-## 前提条件
+## 事前準備
 
-- Azure CLI が利用可能
-- `az login` 済み
-- 対象 Azure OpenAI リソースに対して必要な権限がある
-- Azure OpenAI に `GPT-5.4` のデプロイを作成済み
-- Python 3.12+ または Docker が利用可能
+以下を準備してください。
 
-## 設定
+- Azure OpenAI resource
+- Azure OpenAI 上の `gpt-5.4` deployment
+- Azure CLI
+- `az login` 済みのローカル環境
+- Zed
+- Python 3.12+ または Docker / Docker Compose
+- Docker Desktop
 
-環境変数は `AOAI_PROXY_` プレフィックス付きで指定します。
+また、Azure OpenAI の endpoint と deployment 名が必要です。
 
-### 必須
+例:
 
-- `AOAI_PROXY_AZURE_OPENAI_ENDPOINT`  
-  Azure OpenAI のエンドポイント  
-  例: `https://your-resource.openai.azure.com`
+- endpoint: `https://your-resource.cognitiveservices.azure.com`
+- deployment: `gpt-5.4`
 
-- `AOAI_PROXY_AZURE_OPENAI_DEPLOYMENT`  
-  利用する Azure OpenAI デプロイ名  
-  例: `gpt-5-4`
+## クイックスタート
 
-### 任意
+### 1. 設定ファイルを作る
 
-- `AOAI_PROXY_AZURE_OPENAI_API_VERSION`  
-  Azure OpenAI の API バージョン  
-  デフォルト: `preview`
+`.env.example` をコピーして `.env` を作ります。
 
-- `AOAI_PROXY_HOST`  
-  待受ホスト  
-  デフォルト: `0.0.0.0`
-
-- `AOAI_PROXY_PORT`  
-  待受ポート  
-  デフォルト: `8000`
-
-- `AOAI_PROXY_LOG_LEVEL`  
-  ログレベル  
-  デフォルト: `INFO`
-
-- `AOAI_PROXY_REQUEST_TIMEOUT_SECONDS`  
-  Azure OpenAI へのリクエストタイムアウト秒数  
-  デフォルト: `600`
-
-- `AOAI_PROXY_TOKEN_SCOPE`  
-  トークン取得時のスコープ  
-  デフォルト: `https://cognitiveservices.azure.com/.default`
-
-- `AOAI_PROXY_AZURE_OPENAI_BEARER_TOKEN`  
-  Azure OpenAI へ転送する Bearer token を明示指定する場合に使います  
-  指定した場合は Azure CLI による token 取得より優先されます
-
-## 現在の動作状況
-
-このプロキシは、少なくとも以下の構成で動作確認済みです。
-
-- Azure OpenAI 認証: Entra ID
-- 資格情報取得: `AzureCliCredential`
-- Azure OpenAI エンドポイント: `https://rifujita-5627-resource.cognitiveservices.azure.com`
-- Azure OpenAI デプロイ名: `gpt-5.4`
-- クライアント: Zed の OpenAI compatible provider
-- Zed 側設定: `chat_completions: false`
-
-重要な点として、今回の `gpt-5.4` デプロイは Azure 側では `Responses API` を使う構成が安定しており、`/chat/completions` を直接使うより `/responses` を使うほうが適しています。
-
-## ローカル実行
-
-依存関係をインストール:
-
-```sh
-pip install .
-```
-
-環境変数を設定して起動:
-
-```sh
-export AOAI_PROXY_AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com"
-export AOAI_PROXY_AZURE_OPENAI_DEPLOYMENT="gpt-5-4"
-export AOAI_PROXY_AZURE_OPENAI_API_VERSION="preview"
-
-python -m aoai_proxy.main
-```
-
-またはエントリーポイント経由:
-
-```sh
-aoai-proxy
-```
-
-起動後のヘルスチェック:
-
-```sh
-curl http://localhost:8000/healthz
-```
-
-## Docker で使う
-
-### イメージをビルド
-
-```sh
-docker build -t aoai-proxy .
-```
-
-### コンテナ起動
-
-Azure CLI の認証情報をコンテナから使える必要があります。  
-もっとも簡単なのは、ホスト側の Azure CLI 設定ディレクトリをマウントする方法です。
-
-```sh
-docker run --rm -p 8000:8000 \
-  -e AOAI_PROXY_AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com" \
-  -e AOAI_PROXY_AZURE_OPENAI_DEPLOYMENT="gpt-5-4" \
-  -e AOAI_PROXY_AZURE_OPENAI_API_VERSION="preview" \
-  -v "$HOME/.azure:/root/.azure" \
-  aoai-proxy
-```
-
-### Docker Compose で使う
-
-`.env.example` をコピーして `.env` を作成します。
-
-```sh
+```/dev/null/sh#L1-1
 cp .env.example .env
 ```
 
-必要に応じて `.env` を編集します。
+`.env` に最低限以下を設定してください。
 
-```sh
-AOAI_PROXY_AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-AOAI_PROXY_AZURE_OPENAI_DEPLOYMENT=gpt-5-4
+```/dev/null/text#L1-3
+AOAI_PROXY_AZURE_OPENAI_ENDPOINT=https://your-resource.cognitiveservices.azure.com
+AOAI_PROXY_AZURE_OPENAI_DEPLOYMENT=gpt-5.4
 AOAI_PROXY_AZURE_OPENAI_API_VERSION=preview
-AOAI_PROXY_PORT=8000
-AOAI_PROXY_LOG_LEVEL=INFO
-AOAI_PROXY_REQUEST_TIMEOUT_SECONDS=600
-AOAI_PROXY_TOKEN_SCOPE=https://cognitiveservices.azure.com/.default
 ```
 
-起動:
+### 2. Docker で起動する
 
-```sh
+```/dev/null/sh#L1-1
 docker compose up --build
 ```
 
-バックグラウンド起動:
+バックグラウンドで起動する場合:
 
-```sh
+```/dev/null/sh#L1-1
 docker compose up -d --build
 ```
 
-停止:
+### 3. 動作確認
 
-```sh
-docker compose down
+ヘルスチェック:
+
+```/dev/null/sh#L1-1
+curl http://127.0.0.1:8000/healthz
 ```
 
-### 注意点
+モデル一覧:
 
-- コンテナ内では `AzureCliCredential` が Azure CLI のログイン状態を参照します
-- そのため、通常はホストの `~/.azure` をマウントする必要があります
-- Azure CLI は `~/.azure` 配下に `versionCheck.json` や `commands/*.log` などを書き込むため、`read-only` マウントでは動作しません
-- `docker-compose.yml` では `${HOME}/.azure:/root/.azure` を使って読み書き可能でマウントします
-- `docker run` を使う場合も `-v "$HOME/.azure:/root/.azure"` のように `:ro` を付けないでください
-- 必要に応じて Azure CLI バイナリ自体を含む構成に拡張することもできますが、この実装では主に既存ログイン情報の参照を前提としています
-- Docker Desktop や実行環境によっては、追加の調整が必要になる場合があります
-
-もしコンテナ内で `AzureCliCredential` が期待どおり動かない場合は、ホスト上で直接 `python -m aoai_proxy.main` を実行する構成のほうがシンプルです。
-
-## Zed との互換性メモ
-
-Zed の OpenAI compatible provider を使う場合、少なくとも今回の構成では `Supports /chat/completions` を無効にし、`/responses` を使わせる構成のほうが適しています。
-
-設定イメージ:
-
-- API URL: `http://localhost:8000/v1`
-- API Key: 任意のダミー値
-- Model: `gpt-5.4`
-- `chat_completions`: `false`
-
-補足:
-
-- `chat_completions: true` の場合、Zed は `/v1/chat/completions` を使います
-- このプロキシには `/chat/completions -> /responses` の変換レイヤーも入れています
-- ただし、GPT-5.4 の Azure デプロイでは `/responses` を直接使うほうが自然です
-- AI agent として使う場合、Zed は多量の `tools` と長い履歴を含む `/responses` リクエストを送ることがあります
-- 対象ファイルに未保存変更があると、Zed 側の edit 系ツールが安全のため停止することがあります
-
-## 動作確認
-
-### `GET /v1/models`
-
-```sh
-curl http://localhost:8000/v1/models
+```/dev/null/sh#L1-1
+curl http://127.0.0.1:8000/v1/models
 ```
 
-### `POST /v1/responses`
+Responses API の簡単な確認:
 
-```sh
-curl http://localhost:8000/v1/responses \
+```/dev/null/sh#L1-7
+curl http://127.0.0.1:8000/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4",
@@ -234,159 +90,125 @@ curl http://localhost:8000/v1/responses \
   }'
 ```
 
-### `POST /v1/responses` with structured input
+### 4. ローカルで直接起動したい場合
 
-```sh
-curl http://localhost:8000/v1/responses \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-5.4",
-    "stream": true,
-    "input": [
-      {
-        "type": "message",
-        "role": "user",
-        "content": [
-          { "type": "input_text", "text": "Hello!" }
+依存を入れて起動します。
+
+```/dev/null/sh#L1-2
+pip install .
+python -m aoai_proxy.main
+```
+
+または:
+
+```/dev/null/sh#L1-1
+aoai-proxy
+```
+
+## Zed の設定方法
+
+Zed では OpenAI compatible provider としてこのプロキシを追加します。
+
+### 重要なポイント
+
+- Base URL は `http://localhost:8000/v1`
+- API Key はダミー値でよい
+- Model は Azure 側の deployment 名を使う
+- **`chat_completions` は `false` にする**
+
+このプロキシは `responses-first` なので、Zed には `/v1/responses` を使わせる構成を推奨します。
+
+### 設定例
+
+```/dev/null/json#L1-20
+{
+  "language_models": {
+    "openai_compatible": {
+      "aoai_proxy": {
+        "api_url": "http://localhost:8000/v1",
+        "available_models": [
+          {
+            "name": "gpt-5.4",
+            "max_tokens": 200000,
+            "max_output_tokens": 32000,
+            "max_completion_tokens": 200000,
+            "capabilities": {
+              "tools": true,
+              "images": false,
+              "parallel_tool_calls": false,
+              "prompt_cache_key": false,
+              "chat_completions": false
+            }
+          }
         ]
       }
-    ]
-  }'
+    }
+  }
+}
 ```
 
-## Zed から使う
+### Zed での確認ポイント
 
-Zed 側では OpenAI 互換プロバイダとしてこのプロキシを指定します。
+- モデル: `gpt-5.4`
+- OpenAI compatible provider の接続先: `http://localhost:8000/v1`
+- `chat_completions: false`
 
-考え方としては次の通りです。
+## 補足
 
-- Base URL: `http://localhost:8000/v1`
-- Model: `gpt-5.4` または Azure 側のデプロイ名
-- API Key: 任意のダミー文字列で可
-- `Supports /chat/completions`: 無効
-- `chat_completions`: `false`
+### なぜ `/responses` を使うのか
 
-例:
+今回の Azure OpenAI `gpt-5.4` deployment では、`/chat/completions` よりも `Responses API` を使う構成の方が安定していました。
 
-- Base URL: `http://127.0.0.1:8000/v1`
-- API Key: `dummy`
-- Model: `gpt-5.4`
-- `chat_completions`: `false`
+そのため、このプロキシは `/v1/responses` を正規ルートとして扱います。
 
-クライアントによっては `Authorization: Bearer <api_key>` を必須で送るものがありますが、このプロキシはクライアントからの API キーを Azure OpenAI には使いません。Azure 向けには Entra ID トークンへ差し替えて転送します。
+### どこまで動作確認できているか
 
-## GPT-5.4 デプロイについて
+少なくとも以下は確認済みです。
 
-このプロキシは、実際に Azure OpenAI 上で作成したデプロイ名を使ってリクエストを転送します。  
-そのため、`GPT-5.4` を使いたい場合は、Azure OpenAI で対象モデルをデプロイし、そのデプロイ名を `AOAI_PROXY_AZURE_OPENAI_DEPLOYMENT` に設定してください。
+- Zed の OpenAI compatible provider から接続できる
+- Azure OpenAI へ Entra ID 認証で接続できる
+- `POST /v1/responses` が成功する
+- Zed の AI Agent で通常応答が表示される
+- terminal tool 呼び出しと、その結果を踏まえた応答が返る
 
-例:
+### 注意点
 
-- Azure モデル: `GPT-5.4`
-- Azure デプロイ名: `gpt-5-4`
+- 問題切り分け時は、長い既存 session ではなく **新しい clean session / thread** で確認してください
+- 長い session では `function_call` / `function_call_output` の履歴が大量に蓄積し、不安定化の原因になることがあります
+- 対象ファイルに未保存変更がある場合、Zed の edit 系 tool は安全のため停止することがあります
+- Azure CLI 認証を使うため、Docker 利用時は `~/.azure` をコンテナにマウントする必要があります
 
-このとき環境変数は以下のようになります。
+### 主な環境変数
 
-```sh
-export AOAI_PROXY_AZURE_OPENAI_DEPLOYMENT="gpt-5-4"
-```
+必須:
 
-## 実装上の補足
+- `AOAI_PROXY_AZURE_OPENAI_ENDPOINT`
+- `AOAI_PROXY_AZURE_OPENAI_DEPLOYMENT`
 
-- `GET /v1/models` は静的に 1 モデルを返します
-- 実際の Azure OpenAI への転送時は、設定されたデプロイ名を使用します
-- `/v1/responses` は Azure OpenAI の `openai/v1/responses` に転送します
-- `/v1/responses` は raw SSE passthrough を優先し、上流の Responses API イベント列を極力そのまま返します
-- `function_call_output.output` は Azure 側の安定性向上のため、最小限の正規化を行います
-- `stream: true` を含む JSON リクエストはストリーミングとして上流へ転送します
-- ストリーミングレスポンスは `StreamingResponse` でクライアントへそのまま返します
-- `/v1/chat/completions` はこのプロキシの正規ルートではありません
-- `/v1/embeddings` は Azure OpenAI の deployment ベースのエンドポイントに転送します
-- `OPTIONS` を含む一般的な OpenAI 互換クライアントの呼び出しにも対応します
-- それ以外のパスは、そのまま Azure OpenAI 側へ中継しますが、互換性はエンドポイント次第です
+任意:
 
-## トラブルシュート
-
-### 1. 401 / 403 になる
-
-確認ポイント:
-
-- `az login` 済みか
-- 正しい Azure テナントでログインしているか
-- Azure OpenAI リソースへの権限があるか
-- `AOAI_PROXY_AZURE_OPENAI_ENDPOINT` が正しいか
-
-Azure CLI の状態確認:
-
-```sh
-az account show
-```
-
-### 2. モデルが見つからない
-
-- `AOAI_PROXY_AZURE_OPENAI_DEPLOYMENT` に指定した値が Azure 上のデプロイ名と一致しているか確認してください
-- モデル名そのものではなく、デプロイ名が必要です
-
-### 3. Docker では動かないがローカルでは動く
-
-- コンテナ内に Azure CLI が存在するか
-- `~/.azure` のマウントが正しいか
-- `~/.azure` を `:ro` 付きで read-only マウントしていないか
-- コンテナ内から Azure CLI 資格情報が参照可能か
-- `AOAI_PROXY_AZURE_OPENAI_BEARER_TOKEN` を使うと Azure CLI 依存を避けられます
-- まずはホスト実行で動作確認してから Docker 化すると切り分けしやすいです
-
-### 4. Zed から接続できない / `response failed` になる
-
-- Base URL が `http://localhost:8000/v1` になっているか
-- モデル名に Azure デプロイ名を指定しているか
-- `chat_completions` を `false` にしているか
-- Zed が `/v1/responses` を使っているか
-- 対象ファイルに未保存変更があり、edit 系 tool が止まっていないか
-- tool 呼び出し履歴が長大になっていないか
-- ローカルファイアウォールやポート競合がないか
-
-## セキュリティ上の注意
-
-- このプロキシ自体にはクライアント認証を入れていません
-- ローカル利用または信頼できるネットワーク内利用を前提にしてください
-- 外部公開する場合は、少なくともリバースプロキシ・IP 制限・認証を追加してください
-- Azure CLI の認証情報ディレクトリを扱うため、コンテナ共有時はアクセス権に注意してください
+- `AOAI_PROXY_AZURE_OPENAI_API_VERSION`
+- `AOAI_PROXY_AZURE_OPENAI_BEARER_TOKEN`
+- `AOAI_PROXY_HOST`
+- `AOAI_PROXY_PORT`
+- `AOAI_PROXY_LOG_LEVEL`
+- `AOAI_PROXY_REQUEST_TIMEOUT_SECONDS`
+- `AOAI_PROXY_TOKEN_SCOPE`
 
 ## テスト
 
 テスト依存を入れる:
 
-```sh
+```/dev/null/sh#L1-1
 uv sync --extra test
 ```
 
 テスト実行:
 
-```sh
+```/dev/null/sh#L1-1
 uv run pytest -q
 ```
 
-pytest は `tests/` 配下のみを対象にするよう設定済みです。  
-そのため、同じリポジトリ内に clone した別プロジェクトや fixture のテストを誤って拾わない構成になっています。
-
-現在は主に以下の単体テストを入れています。
-
-- `chat/completions -> responses` 変換
-- `responses -> chat.completions` 変換
-- streaming event の変換補助関数
-
-## 今後の拡張候補
-
-- `/v1/responses` の安定化と Zed agent 向け最適化
-- `function_call_output` の追加正規化
-- 長大な tool 呼び出し履歴に対する圧縮・最適化
-- API キーや Basic 認証によるプロキシ自身の保護
-- 複数デプロイの動的ルーティング
-- ヘッダーや監査ログの強化
-- モデル名と Azure デプロイ名のマッピング機能
-- 必要なら `/v1/chat/completions` の完全削除
-
 ## ライセンス
 
-必要に応じて追加してください。
+MIT
