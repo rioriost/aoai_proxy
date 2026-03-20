@@ -111,15 +111,10 @@ def _looks_like_tool_error(value: Any) -> bool:
         )
 
     if isinstance(value, dict):
-        if any(
-            key in value for key in ("error", "errors", "message", "detail", "code")
-        ):
+        if any(key in value for key in ("error", "errors", "message", "detail", "code")):
             return True
 
-        return any(
-            key in value
-            for key in ("trace", "traceback", "stack", "exception", "stderr")
-        )
+        return any(key in value for key in ("trace", "traceback", "stack", "exception", "stderr"))
 
     return False
 
@@ -264,10 +259,7 @@ class AzureOpenAIProxy:
             query = query_params.copy()
             if "api-version" not in query:
                 query["api-version"] = self.config.azure_openai_api_version
-            return (
-                f"{self.config.normalized_endpoint}/openai/v1/responses"
-                f"?{urlencode(query)}"
-            )
+            return f"{self.config.normalized_endpoint}/openai/v1/responses?{urlencode(query)}"
 
         if normalized_path == "embeddings":
             query = query_params.copy()
@@ -351,25 +343,17 @@ class AzureOpenAIProxy:
             if isinstance(input_items, list):
                 for item in input_items:
                     if not isinstance(item, dict):
-                        item_type_counts["<non-dict>"] = (
-                            item_type_counts.get("<non-dict>", 0) + 1
-                        )
+                        item_type_counts["<non-dict>"] = item_type_counts.get("<non-dict>", 0) + 1
                         continue
 
                     item_type = item.get("type")
-                    item_type_key = (
-                        item_type if isinstance(item_type, str) else "<missing>"
-                    )
-                    item_type_counts[item_type_key] = (
-                        item_type_counts.get(item_type_key, 0) + 1
-                    )
+                    item_type_key = item_type if isinstance(item_type, str) else "<missing>"
+                    item_type_counts[item_type_key] = item_type_counts.get(item_type_key, 0) + 1
 
                     if item_type == "message":
                         role = item.get("role")
                         role_key = role if isinstance(role, str) else "<missing>"
-                        message_role_counts[role_key] = (
-                            message_role_counts.get(role_key, 0) + 1
-                        )
+                        message_role_counts[role_key] = message_role_counts.get(role_key, 0) + 1
 
                         content = item.get("content")
                         if isinstance(content, list):
@@ -382,9 +366,7 @@ class AzureOpenAIProxy:
 
                                 part_type = part.get("type")
                                 part_type_key = (
-                                    part_type
-                                    if isinstance(part_type, str)
-                                    else "<missing>"
+                                    part_type if isinstance(part_type, str) else "<missing>"
                                 )
                                 content_type_counts[part_type_key] = (
                                     content_type_counts.get(part_type_key, 0) + 1
@@ -483,9 +465,7 @@ class AzureOpenAIProxy:
             return Response(
                 content=content,
                 status_code=upstream_response.status_code,
-                media_type=upstream_response.headers.get(
-                    "content-type", "application/json"
-                ),
+                media_type=upstream_response.headers.get("content-type", "application/json"),
             )
 
         async def iterator() -> AsyncIterator[bytes]:
@@ -542,9 +522,7 @@ class AzureOpenAIProxy:
             "trailers",
             "upgrade",
         }
-        return {
-            key: value for key, value in headers.items() if key.lower() not in excluded
-        }
+        return {key: value for key, value in headers.items() if key.lower() not in excluded}
 
     @staticmethod
     def _decode_json_response(response: httpx.Response) -> dict[str, Any]:
@@ -596,7 +574,7 @@ async def healthz() -> dict[str, str]:
 @app.get("/")
 async def root() -> dict[str, str]:
     return {
-        "service": "aoai-proxy",
+        "service": "aoai_proxy",
         "status": "ok",
         "deployment": settings.azure_openai_deployment,
     }
@@ -622,7 +600,7 @@ async def proxy_v1(path: str, request: Request) -> Response:
 async def proxy_root(path: str, request: Request) -> Response:
     normalized_path = path.lstrip("/")
     if normalized_path == "":
-        return PlainTextResponse("aoai-proxy", status_code=200)
+        return PlainTextResponse("aoai_proxy", status_code=200)
     return await app.state.proxy.forward(request, normalized_path)
 
 

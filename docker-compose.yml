@@ -1,10 +1,10 @@
 services:
-  aoai-proxy:
+  aoai_proxy:
     build:
       context: .
       dockerfile: Dockerfile
-    image: aoai-proxy:latest
-    container_name: aoai-proxy
+    image: aoai_proxy:latest
+    container_name: aoai_proxy
     ports:
       - "${AOAI_PROXY_PORT:-8000}:8000"
     environment:

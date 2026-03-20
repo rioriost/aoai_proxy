@@ -21,6 +21,5 @@ build:
 formula:
 	mkdir -p "$(FORMULA_DIR)"
 	genformula \
-		--pyproject "$(REPO_ROOT)/pyproject.toml" \
-		--source-subdir . \
-		--output "$(FORMULA_FILE)"
+		--install-mode advanced \
+		--source-subdir .

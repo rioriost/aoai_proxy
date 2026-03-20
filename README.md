@@ -1,4 +1,4 @@
-# aoai-proxy
+# aoai_proxy
 
 Zed からは OpenAI 互換 API サーバとして見えつつ、Azure OpenAI には Entra ID 認証で接続するための軽量プロキシです。
 
@@ -102,7 +102,7 @@ python -m aoai_proxy.main
 または:
 
 ```/dev/null/sh#L1-1
-aoai-proxy
+aoai_proxy
 ```
 
 ## Zed の設定方法

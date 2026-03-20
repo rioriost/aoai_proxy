@@ -1,6 +1,6 @@
 [project]
-name = "aoai-proxy"
-version = "0.1.2"
+name = "aoai_proxy"
+version = "0.1.3"
 description = "OpenAI-compatible proxy for Azure OpenAI using Entra ID authentication"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.12"
@@ -24,7 +24,7 @@ test = [
 ]
 
 [project.scripts]
-aoai-proxy = "aoai_proxy.main:main"
+aoai_proxy = "aoai_proxy.main:main"
 
 [project.urls]
 Homepage = "https://github.com/rioriost/aoai_proxy"
