@@ -1,17 +1,19 @@
 import os
 
+from fastapi import HTTPException
+from fastapi.testclient import TestClient
+
 os.environ.setdefault(
     "AOAI_PROXY_AZURE_OPENAI_ENDPOINT",
     "https://example.cognitiveservices.azure.com",
 )
 os.environ.setdefault("AOAI_PROXY_AZURE_OPENAI_DEPLOYMENT", "gpt-5.4")
 
-from fastapi import HTTPException
-
 from aoai_proxy.main import (
     AzureOpenAIProxy,
+    app,
+    load_settings,
     sanitize_responses_request,
-    settings,
 )
 
 
@@ -235,6 +237,7 @@ def test_sanitize_responses_request_returns_copy():
 
 
 def test_upstream_url_for_responses_uses_openai_v1_responses():
+    settings = load_settings()
     proxy = AzureOpenAIProxy(settings)
 
     try:
@@ -247,6 +250,44 @@ def test_upstream_url_for_responses_uses_openai_v1_responses():
         import asyncio
 
         asyncio.run(proxy.close())
+
+
+def test_load_settings_reads_environment_lazily():
+    settings = load_settings()
+
+    assert settings.azure_openai_endpoint == "https://example.cognitiveservices.azure.com"
+    assert settings.azure_openai_deployment == "gpt-5.4"
+    assert settings.azure_openai_api_version == "preview"
+
+
+def test_root_endpoint_returns_service_status_and_deployment():
+    with TestClient(app) as client:
+        response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "service": "aoai_proxy",
+        "status": "ok",
+        "deployment": "gpt-5.4",
+    }
+
+
+def test_models_endpoint_returns_configured_deployment():
+    with TestClient(app) as client:
+        response = client.get("/v1/models")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "object": "list",
+        "data": [
+            {
+                "id": "gpt-5.4",
+                "object": "model",
+                "created": 0,
+                "owned_by": "azure-openai",
+            }
+        ],
+    }
 
 
 def test_forward_chat_completions_is_not_supported():

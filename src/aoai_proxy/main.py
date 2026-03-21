@@ -60,7 +60,8 @@ class Settings(BaseSettings):
         return self.azure_openai_endpoint.rstrip("/")
 
 
-settings = Settings()
+def load_settings() -> Settings:
+    return Settings()
 
 
 def _json_loads(payload: bytes) -> dict[str, Any] | None:
@@ -545,7 +546,9 @@ class AzureOpenAIProxy:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    settings = load_settings()
     proxy = AzureOpenAIProxy(settings)
+    app.state.settings = settings
     app.state.proxy = proxy
     logger.info(
         "Starting Azure OpenAI proxy for endpoint=%s deployment=%s",
@@ -572,17 +575,17 @@ async def healthz() -> dict[str, str]:
 
 
 @app.get("/")
-async def root() -> dict[str, str]:
+async def root(request: Request) -> dict[str, str]:
     return {
         "service": "aoai_proxy",
         "status": "ok",
-        "deployment": settings.azure_openai_deployment,
+        "deployment": request.app.state.settings.azure_openai_deployment,
     }
 
 
 @app.get("/v1/models")
-async def list_models() -> Response:
-    return JSONResponse(content=app.state.proxy.models_payload())
+async def list_models(request: Request) -> Response:
+    return JSONResponse(content=request.app.state.proxy.models_payload())
 
 
 @app.api_route(
@@ -606,6 +609,8 @@ async def proxy_root(path: str, request: Request) -> Response:
 
 def main() -> None:
     import uvicorn
+
+    settings = load_settings()
 
     uvicorn.run(
         "aoai_proxy.main:app",
